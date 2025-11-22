@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { AngularScanner } from './backed/AngularScanner';
 import { AngularParser } from './backed/AngularParser';
 import { TemplateParser } from './backed/TemplateParser';
+import { ChildResolver } from './backed/ChildResolver';  
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -12,11 +13,15 @@ export function activate(context: vscode.ExtensionContext) {
 		const scanner = new AngularScanner();
 		const parser = new AngularParser();
 		const templateParser = new TemplateParser();
+		const childResolver = new ChildResolver(); 
 
 		try {
 			// 1. Scan for .component.ts files
 			const files = await scanner.scanComponents();
 			console.log('[AngularTree] Component files:', files);
+
+			// Store parsed metadata
+			const allMetadata = [];
 
 			// 2. Parse each component
 			for (const file of files) {
@@ -27,14 +32,20 @@ export function activate(context: vscode.ExtensionContext) {
 					continue;
 				}
 
-				// 3. Parse the template or templateUrl
+				// 3. Parse inline or external template and extract used selectors
 				const metaWithSelectors = templateParser.parseTemplate(meta);
+
+				allMetadata.push(metaWithSelectors);
 
 				console.log('[AngularTree] Parsed metadata:', metaWithSelectors);
 			}
 
+			// 4. Resolve parent → child relationships (NEW)
+			const relations = childResolver.resolveChildren(allMetadata);
+			console.log('[AngularTree] Parent → Child relations:', relations);
+
 			vscode.window.showInformationMessage(
-				`Scanning complete. Found ${files.length} component files.`
+				`Scanning complete. Found ${allMetadata.length} Angular components.`
 			);
 
 		} catch (err) {
