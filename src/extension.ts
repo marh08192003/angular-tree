@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
+
 import { AngularScanner } from './backed/AngularScanner';
 import { AngularParser } from './backed/AngularParser';
+import { TemplateParser } from './backed/TemplateParser';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -9,18 +11,36 @@ export function activate(context: vscode.ExtensionContext) {
 
 		const scanner = new AngularScanner();
 		const parser = new AngularParser();
+		const templateParser = new TemplateParser();
 
-		const files = await scanner.scanComponents();
+		try {
+			// 1. Scan for .component.ts files
+			const files = await scanner.scanComponents();
+			console.log('[AngularTree] Component files:', files);
 
-		console.log('[AngularTree] Component files:', files);
+			// 2. Parse each component
+			for (const file of files) {
+				const meta = parser.parseComponent(file);
 
-		// (Opcional) probar el parser ahora mismo:
-		for (const file of files) {
-			const meta = parser.parseComponent(file);
-			console.log('Parsed metadata:', meta);
+				if (!meta) {
+					console.warn('[AngularTree] Skipped non-component file:', file);
+					continue;
+				}
+
+				// 3. Parse the template or templateUrl
+				const metaWithSelectors = templateParser.parseTemplate(meta);
+
+				console.log('[AngularTree] Parsed metadata:', metaWithSelectors);
+			}
+
+			vscode.window.showInformationMessage(
+				`Scanning complete. Found ${files.length} component files.`
+			);
+
+		} catch (err) {
+			console.error('[AngularTree] Error:', err);
+			vscode.window.showErrorMessage('Error parsing Angular components. Check console.');
 		}
-
-		vscode.window.showInformationMessage(`Found ${files.length} Angular components`);
 	});
 
 	context.subscriptions.push(disposable);
