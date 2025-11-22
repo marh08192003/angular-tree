@@ -1,26 +1,38 @@
 // The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
+import { AngularScanner } from './backed/AngularScanner';
+
 // This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "angular-tree" is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('angular-tree.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
+	// Register command
+	const disposable = vscode.commands.registerCommand('angular-tree.helloWorld', async () => {
+		// Display message
 		vscode.window.showInformationMessage('Hello World from Angular Tree!');
+
+		// --- NEW: Run AngularScanner ---
+		try {
+			const scanner = new AngularScanner();
+			const componentFiles = await scanner.scanComponents();
+
+			console.log('[AngularTree] Found components:', componentFiles);
+
+			vscode.window.showInformationMessage(
+				`Found ${componentFiles.length} Angular components`
+			);
+
+		} catch (err) {
+			console.error('[AngularTree] Error scanning components', err);
+			vscode.window.showErrorMessage('Error scanning Angular components. Check console.');
+		}
+		// ---------------------------------
 	});
 
 	context.subscriptions.push(disposable);
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() { }
