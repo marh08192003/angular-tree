@@ -1,7 +1,7 @@
 {
   "name": "angular-tree",
   "displayName": "Angular Tree",
-  "description": "This extension scans your Angular project, analyzes component templates and imports, and rendes an interactive hierarchy tree showing parent-child relationships. Click any node to jump to its source. Supports Angular standalone components, template selectors, and dynamic refresh on save",
+  "description": "This extension scans your Angular project, analyzes component templates and imports, and renders an interactive hierarchy tree showing parent-child relationships. Click any node to jump to its source. Supports Angular standalone components, template selectors, and dynamic refresh on save.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.106.1"
@@ -16,6 +16,10 @@
       {
         "command": "angular-tree.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "angular-tree.showHierarchy",
+        "title": "Angular Tree: Show Angular Hierarchy Tree"
       }
     ]
   },
