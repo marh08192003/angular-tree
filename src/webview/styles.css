@@ -1,9 +1,10 @@
 body {
-    padding: 0;
     margin: 0;
+    padding: 0;
     font-family: var(--vscode-font-family);
     background-color: var(--vscode-editor-background);
     color: var(--vscode-editor-foreground);
+    overflow: hidden;
 }
 
 /* Header */
@@ -15,41 +16,47 @@ body {
 
 #title {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 500;
 }
 
-/* Main container */
+/* Tree container */
 #tree-root {
-    padding: 16px;
-    overflow: auto;
+    width: 100%;
     height: calc(100vh - 50px);
+    overflow: hidden;
 }
 
-/* Loading */
-.loading {
-    color: var(--vscode-editor-info-foreground);
-    font-size: 14px;
-}
-
-/* Error messages */
-.error {
-    color: var(--vscode-editorError-foreground);
-    font-size: 14px;
-    padding: 8px;
-    border-left: 3px solid var(--vscode-editorError-foreground);
-}
-
-/* Basic tree node styling (TreeRenderer will override) */
-.tree-node {
-    padding: 4px 8px;
-    margin-bottom: 4px;
-    border-radius: 4px;
+/* Node (circle) */
+.node-circle {
+    fill: var(--vscode-editorInfo-foreground);
+    stroke: var(--vscode-editor-foreground);
+    stroke-width: 1.2px;
     cursor: pointer;
-    user-select: none;
-    background-color: var(--vscode-editorWidget-background);
 }
 
-.tree-node:hover {
-    background-color: var(--vscode-editorHoverWidget-background);
+/* Node label */
+.node-label {
+    font-size: 13px;
+    fill: var(--vscode-editor-foreground);
+    cursor: pointer;
+}
+
+/* Links */
+.link {
+    fill: none;
+    stroke: var(--vscode-editorWidget-border);
+    stroke-width: 1.4px;
+}
+
+/* Loading state */
+.loading {
+    padding: 20px;
+    color: var(--vscode-editorInfo-foreground);
+}
+
+/* Error */
+.error {
+    padding: 10px;
+    color: var(--vscode-editorError-foreground);
 }
