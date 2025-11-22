@@ -5,6 +5,7 @@ import { AngularParser } from './backed/AngularParser';
 import { TemplateParser } from './backed/TemplateParser';
 import { ChildResolver } from './backed/ChildResolver';
 import { ImportResolver } from './backed/ImportResolver';
+import { HierarchyBuilder } from './backed/HierarchyBuilder';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
 		const templateParser = new TemplateParser();
 		const childResolver = new ChildResolver();
 		const importResolver = new ImportResolver();
+		const hierarchyBuilder = new HierarchyBuilder(); 
 
 		try {
 			// ----------------------------------------
@@ -59,8 +61,19 @@ export function activate(context: vscode.ExtensionContext) {
 			const importRelations = importResolver.resolveImports(allMetadata);
 			console.log('[AngularTree] Relations from imports:', importRelations);
 
+			// ----------------------------------------
+			// 6. Build final hierarchy tree
+			// ----------------------------------------
+			const tree = hierarchyBuilder.buildHierarchy(
+				allMetadata,
+				selectorRelations,
+				importRelations
+			);
+
+			console.log('[AngularTree] Final hierarchy tree:', JSON.stringify(tree, null, 2));
+
 			vscode.window.showInformationMessage(
-				`Scanning complete. Found ${allMetadata.length} Angular components.`
+				`Hierarchy built successfully. Found ${allMetadata.length} Angular components.`
 			);
 
 		} catch (err) {
