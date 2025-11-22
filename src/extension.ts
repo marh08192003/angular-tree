@@ -1,38 +1,29 @@
-// The module 'vscode' contains the VS Code extensibility API
 import * as vscode from 'vscode';
-
 import { AngularScanner } from './backed/AngularScanner';
+import { AngularParser } from './backed/AngularParser';
 
-// This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
 
-	console.log('Congratulations, your extension "angular-tree" is now active!');
-
-	// Register command
 	const disposable = vscode.commands.registerCommand('angular-tree.helloWorld', async () => {
-		// Display message
-		vscode.window.showInformationMessage('Hello World from Angular Tree!');
+		vscode.window.showInformationMessage('Scanning Angular components...');
 
-		// --- NEW: Run AngularScanner ---
-		try {
-			const scanner = new AngularScanner();
-			const componentFiles = await scanner.scanComponents();
+		const scanner = new AngularScanner();
+		const parser = new AngularParser();
 
-			console.log('[AngularTree] Found components:', componentFiles);
+		const files = await scanner.scanComponents();
 
-			vscode.window.showInformationMessage(
-				`Found ${componentFiles.length} Angular components`
-			);
+		console.log('[AngularTree] Component files:', files);
 
-		} catch (err) {
-			console.error('[AngularTree] Error scanning components', err);
-			vscode.window.showErrorMessage('Error scanning Angular components. Check console.');
+		// (Opcional) probar el parser ahora mismo:
+		for (const file of files) {
+			const meta = parser.parseComponent(file);
+			console.log('Parsed metadata:', meta);
 		}
-		// ---------------------------------
+
+		vscode.window.showInformationMessage(`Found ${files.length} Angular components`);
 	});
 
 	context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() { }
