@@ -127,12 +127,30 @@ export function activate(context: vscode.ExtensionContext) {
 			let html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
 
 			// Fix resource loading (scripts, css)
-			const webviewUri = panel.webview.asWebviewUri(
-				vscode.Uri.joinPath(context.extensionUri, 'src', 'webview')
+			const webviewRoot = vscode.Uri.joinPath(context.extensionUri, "src", "webview");
+
+			const stylesCss = panel.webview.asWebviewUri(
+				vscode.Uri.joinPath(webviewRoot, "styles.css")
+			);
+
+			const d3Js = panel.webview.asWebviewUri(
+				vscode.Uri.joinPath(webviewRoot, "d3.min.js")
+			);
+
+			const treeRenderer = panel.webview.asWebviewUri(
+				vscode.Uri.joinPath(webviewRoot, "TreeRenderer.js")
+			);
+
+			const mainJs = panel.webview.asWebviewUri(
+				vscode.Uri.joinPath(webviewRoot, "main.js")
 			);
 
 			html = html
-				.replace(/{{webviewRoot}}/g, webviewUri.toString());
+				.replace("{{stylesCss}}", stylesCss.toString())
+				.replace("{{d3Js}}", d3Js.toString())
+				.replace("{{treeRenderer}}", treeRenderer.toString())
+				.replace("{{mainJs}}", mainJs.toString());
+
 
 			panel.webview.html = html;
 

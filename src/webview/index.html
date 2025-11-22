@@ -4,36 +4,28 @@
 <head>
     <meta charset="UTF-8" />
 
-    <meta http-equiv="Content-Security-Policy" content="
-            default-src 'none';
-            img-src vscode-resource: https:;
-            script-src 'unsafe-inline' 'unsafe-eval' {{webviewRoot}} vscode-resource:;
-            style-src 'unsafe-inline' {{webviewRoot}} vscode-resource:;
-            font-src {{webviewRoot}} vscode-resource:;
-          ">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none';
+                   img-src vscode-resource:;
+                   script-src 'unsafe-inline' 'unsafe-eval' vscode-resource:;
+                   style-src 'unsafe-inline' vscode-resource:;
+                   font-src vscode-resource:;">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Angular Hierarchy Tree</title>
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="{{webviewRoot}}/styles.css" />
+    <link rel="stylesheet" href="{{stylesCss}}">
 </head>
 
 <body>
-
-    <!-- Toolbar -->
     <header id="header">
         <h1 id="title">Angular Hierarchy Tree</h1>
     </header>
 
-    <!-- Main container for the tree -->
     <div id="tree-root"></div>
 
-    <!-- Scripts -->
-    <script src="{{webviewRoot}}/main.js"></script>
-    <script src="{{webviewRoot}}/d3.min.js"></script>
-    <script src="{{webviewRoot}}/TreeRenderer.js"></script>
-
+    <script src="{{d3Js}}"></script>
+    <script src="{{treeRenderer}}"></script>
+    <script src="{{mainJs}}"></script>
 </body>
 
 </html>

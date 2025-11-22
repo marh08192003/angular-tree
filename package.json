@@ -4,12 +4,15 @@
   "description": "This extension scans your Angular project, analyzes component templates and imports, and renders an interactive hierarchy tree showing parent-child relationships. Click any node to jump to its source. Supports Angular standalone components, template selectors, and dynamic refresh on save.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.106.1"
+    "vscode": "^1.103.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:angular-tree.helloWorld",
+    "onCommand:angular-tree.showHierarchy"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -38,7 +41,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.106.1",
+    "@types/vscode": "^1.103.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "typescript-eslint": "^8.46.3",
