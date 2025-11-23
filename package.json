@@ -3,7 +3,8 @@
   "displayName": "Angular Tree",
   "publisher": "Marh0819",
   "description": "This extension scans your Angular project, analyzes component templates and imports, and renders an interactive hierarchy tree showing parent-child relationships. Click any node to jump to its source. Supports Angular standalone components, template selectors, and dynamic refresh on save.",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "icon": "images/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/marh08192003/angular-tree.git"
