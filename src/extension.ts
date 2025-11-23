@@ -5,13 +5,14 @@ import { AngularParser } from './backed/AngularParser';
 import { TemplateParser } from './backed/TemplateParser';
 import { ChildResolver } from './backed/ChildResolver';
 import { ImportResolver } from './backed/ImportResolver';
+import { RouterResolver } from './backed/RouterResolver';
 import { HierarchyBuilder } from './backed/HierarchyBuilder';
 
 export function activate(context: vscode.ExtensionContext) {
 
 	/**
 	 * ---------------------------------------------------------
-	 * Command 1 (existing): Hello World
+	 * Command 1: Hello World (debug-only)
 	 * ---------------------------------------------------------
 	 */
 	const helloCmd = vscode.commands.registerCommand('angular-tree.helloWorld', async () => {
@@ -22,6 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
 		const templateParser = new TemplateParser();
 		const childResolver = new ChildResolver();
 		const importResolver = new ImportResolver();
+		const routerResolver = new RouterResolver();
 		const hierarchyBuilder = new HierarchyBuilder();
 
 		try {
@@ -41,10 +43,15 @@ export function activate(context: vscode.ExtensionContext) {
 			const selectorRelations = childResolver.resolveChildren(allMetadata);
 			const importRelations = importResolver.resolveImports(allMetadata);
 
+			const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath ?? "";
+			const routeRelationsObj = routerResolver.resolveRoutes(allMetadata, workspaceRoot);
+			const routeRelations = new Map<string, string[]>(Object.entries(routeRelationsObj));
+
 			const tree = hierarchyBuilder.buildHierarchy(
 				allMetadata,
 				selectorRelations,
-				importRelations
+				importRelations,
+				routeRelations
 			);
 
 			console.log('[AngularTree] Final hierarchy tree:', tree);
@@ -60,22 +67,20 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(helloCmd);
 
 
-
 	/**
 	 * ---------------------------------------------------------
-	 * Command 2 (NEW): Show Hierarchy Webview
+	 * Command 2: Show Hierarchy Webview
 	 * ---------------------------------------------------------
 	 */
 	const showHierarchyCmd = vscode.commands.registerCommand('angular-tree.showHierarchy', async () => {
 		try {
-			// -------------------------------------------------
-			// 1. Run backend pipeline to build the tree
-			// -------------------------------------------------
+			// Backend pipeline
 			const scanner = new AngularScanner();
 			const parser = new AngularParser();
 			const templateParser = new TemplateParser();
 			const childResolver = new ChildResolver();
 			const importResolver = new ImportResolver();
+			const routerResolver = new RouterResolver();
 			const hierarchyBuilder = new HierarchyBuilder();
 
 			const files = await scanner.scanComponents();
@@ -92,10 +97,15 @@ export function activate(context: vscode.ExtensionContext) {
 			const selectorRelations = childResolver.resolveChildren(allMetadata);
 			const importRelations = importResolver.resolveImports(allMetadata);
 
+			const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath ?? "";
+			const routeRelationsObj = routerResolver.resolveRoutes(allMetadata, workspaceRoot);
+			const routeRelations = new Map<string, string[]>(Object.entries(routeRelationsObj));
+
 			const tree = hierarchyBuilder.buildHierarchy(
 				allMetadata,
 				selectorRelations,
-				importRelations
+				importRelations,
+				routeRelations
 			);
 
 			if (!tree) {
@@ -104,43 +114,37 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 
 			// -------------------------------------------------
-			// 2. Create Webview Panel
+			// Create Webview Panel
 			// -------------------------------------------------
 			const panel = vscode.window.createWebviewPanel(
-				'angularHierarchyView',                // internal ID
-				'Angular Hierarchy Tree',             // title shown to user
-				vscode.ViewColumn.One,                // where to show the panel
+				'angularHierarchyView',
+				'Angular Hierarchy Tree',
+				vscode.ViewColumn.One,
 				{
-					enableScripts: true,               // allow JS
+					enableScripts: true,
 					localResourceRoots: [
-						vscode.Uri.joinPath(context.extensionUri, 'dist'),
 						vscode.Uri.joinPath(context.extensionUri, 'src', 'webview')
 					]
 				}
 			);
 
 			// -------------------------------------------------
-			// 3. Load index.html from /src/webview/
+			// Load HTML
 			// -------------------------------------------------
 			const htmlUri = vscode.Uri.joinPath(context.extensionUri, 'src', 'webview', 'index.html');
-
 			let html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
 
-			// Fix resource loading (scripts, css)
 			const webviewRoot = vscode.Uri.joinPath(context.extensionUri, "src", "webview");
 
 			const stylesCss = panel.webview.asWebviewUri(
 				vscode.Uri.joinPath(webviewRoot, "styles.css")
 			);
-
 			const d3Js = panel.webview.asWebviewUri(
 				vscode.Uri.joinPath(webviewRoot, "d3.min.js")
 			);
-
 			const treeRenderer = panel.webview.asWebviewUri(
 				vscode.Uri.joinPath(webviewRoot, "TreeRenderer.js")
 			);
-
 			const mainJs = panel.webview.asWebviewUri(
 				vscode.Uri.joinPath(webviewRoot, "main.js")
 			);
@@ -151,11 +155,10 @@ export function activate(context: vscode.ExtensionContext) {
 				.replace("{{treeRenderer}}", treeRenderer.toString())
 				.replace("{{mainJs}}", mainJs.toString());
 
-
 			panel.webview.html = html;
 
 			// -------------------------------------------------
-			// 4. Send tree data to Webview
+			// Send tree data to Webview
 			// -------------------------------------------------
 			panel.webview.postMessage({
 				type: 'treeData',
@@ -163,7 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
 			});
 
 			// -------------------------------------------------
-			// 5. Listen to messages FROM Webview (openFile, etc.)
+			// Webview → Backend handlers
 			// -------------------------------------------------
 			panel.webview.onDidReceiveMessage(async msg => {
 				if (msg.type === 'openFile') {
