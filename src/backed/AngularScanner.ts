@@ -10,19 +10,19 @@ import * as vscode from 'vscode';
  */
 export class AngularScanner {
 
-    /**
-     * Scans the workspace for Angular components.
-     * @returns Promise<string[]> List of absolute file paths
-     */
     public async scanComponents(): Promise<string[]> {
-        const pattern = '**/*.component.ts';
+        console.log("----------------------------------------------------");
+        console.log("📡 [Scanner] Buscando *.component.ts ...");
 
-        // Search all matching files in the workspace
+        const pattern = '**/*.component.ts';
         const files = await vscode.workspace.findFiles(pattern);
 
-        // Convert Uri → absolute file path
+        console.log(`📁 [Scanner] Archivos encontrados (${files.length}):`);
+        files.forEach(f => console.log("   -", f.fsPath));
+
         const filePaths = files.map(f => f.fsPath);
 
+        console.log("----------------------------------------------------");
         return filePaths;
     }
 }

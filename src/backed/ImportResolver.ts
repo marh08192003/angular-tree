@@ -1,50 +1,34 @@
 import { AngularComponentMetadata } from './types/AngularComponentMetadata';
 
-/**
- * ImportResolver
- * ---------------
- * Adds parent → child relationships based on Angular standalone imports.
- *
- * @Component({
- *   standalone: true,
- *   imports: [ChildAComponent, ChildBComponent]
- * })
- *
- * NOTE:
- * - imports[] contains *class names* of components
- * - selector-based children are resolved by ChildResolver
- * - this module only resolves standalone imports
- */
 export class ImportResolver {
 
-    /**
-     * Builds a mapping:
-     *   parentId → childIds[]
-     * using standalone imports declared in each component.
-     */
     public resolveImports(allMetadata: AngularComponentMetadata[]): Map<string, string[]> {
+        console.log("🟦 [ImportResolver] Analizando imports...");
+
         const classToId = new Map<string, string>();
         const parentToChildren = new Map<string, string[]>();
 
-        // Build dictionary: className -> componentId
-        for (const meta of allMetadata) {
-            classToId.set(meta.className, meta.id);
-        }
+        allMetadata.forEach(m => {
+            classToId.set(m.className, m.id);
+            console.log("📌 class->id:", m.className, "=>", m.id);
+        });
 
-        // Resolve imports for each component
-        for (const parentMeta of allMetadata) {
-            const childIds: string[] = [];
+        allMetadata.forEach(parent => {
+            const children: string[] = [];
 
-            for (const imported of parentMeta.imports) {
-                const childId = classToId.get(imported);
+            parent.imports.forEach(imp => {
+                const childId = classToId.get(imp);
+                console.log("🔎 import:", imp, "=>", childId);
 
                 if (childId) {
-                    childIds.push(childId);
+                    children.push(childId);
                 }
-            }
+            });
 
-            parentToChildren.set(parentMeta.id, childIds);
-        }
+            parentToChildren.set(parent.id, children);
+        });
+
+        console.log("🌳 [ImportResolver] Relaciones:", parentToChildren);
 
         return parentToChildren;
     }

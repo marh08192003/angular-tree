@@ -1,36 +1,26 @@
 import * as fs from 'fs';
 import { AngularComponentMetadata } from './types/AngularComponentMetadata';
 
-/**
- * TemplateParser
- * ---------------
- * Reads Angular component templates (inline or from templateUrl)
- * and extracts child selectors used in the HTML.
- */
 export class TemplateParser {
 
-    /**
-     * Extracts child component selectors used inside the component template.
-     * Fills metadata.usedSelectors[] and returns the updated object.
-     */
     public parseTemplate(metadata: AngularComponentMetadata): AngularComponentMetadata {
+        console.log("🟦 [TemplateParser] Analizando template de:", metadata.className);
+
         const templateText = this.loadTemplateContent(metadata);
         if (!templateText) {
+            console.log("🔴 [TemplateParser] SIN template:", metadata.className);
             metadata.usedSelectors = [];
             return metadata;
         }
 
-        // Detect tags like <app-card>, <my-button>, <shared-list>, etc.
-        const selectorRegex = /<([a-zA-Z0-9-]+)(\s|>)/g;
+        console.log("🟩 [TemplateParser] Template cargado, longitud:", templateText.length);
 
+        const selectorRegex = /<([a-zA-Z0-9-]+)(\s|>)/g;
         const foundSelectors = new Set<string>();
 
         let match: RegExpExecArray | null;
         while ((match = selectorRegex.exec(templateText)) !== null) {
             const tag = match[1];
-
-            // Only keep selectors that look like Angular components:
-            // Must contain at least one hyphen (Angular style)
             if (tag.includes('-')) {
                 foundSelectors.add(tag);
             }
@@ -38,25 +28,23 @@ export class TemplateParser {
 
         metadata.usedSelectors = Array.from(foundSelectors);
 
+        console.log("📌 [TemplateParser] Selectores encontrados:", metadata.usedSelectors);
+
         return metadata;
     }
 
-    /**
-     * Loads the template HTML from templateUrl or inline template.
-     */
     private loadTemplateContent(metadata: AngularComponentMetadata): string | null {
-        // Inline template takes priority
         if (metadata.template) {
+            console.log("🔵 [TemplateParser] Template inline en:", metadata.className);
             return metadata.template;
         }
 
-        // templateUrl
-        if (metadata.templatePath) {
-            if (fs.existsSync(metadata.templatePath)) {
-                return fs.readFileSync(metadata.templatePath, 'utf8');
-            }
+        if (metadata.templatePath && fs.existsSync(metadata.templatePath)) {
+            console.log("📄 [TemplateParser] Cargando templateUrl:", metadata.templatePath);
+            return fs.readFileSync(metadata.templatePath, 'utf8');
         }
 
+        console.warn("⚠️ [TemplateParser] No existe templateUrl:", metadata.templatePath);
         return null;
     }
 }

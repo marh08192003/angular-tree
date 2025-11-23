@@ -10,6 +10,10 @@ export class AngularParser {
      * and extracts metadata from the @Component decorator.
      */
     public parseComponent(filePath: string): AngularComponentMetadata | null {
+
+        console.log("----------------------------------------------------");
+        console.log("🔍 [Parser] Analizando archivo:", filePath);
+
         const sourceText = fs.readFileSync(filePath, 'utf8');
         const sourceFile = ts.createSourceFile(
             filePath,
@@ -30,6 +34,7 @@ export class AngularParser {
             // Extract class name
             if (ts.isClassDeclaration(node) && node.name) {
                 className = node.name.text;
+                console.log("📌 [Parser] className:", className);
             }
 
             // Look for @Component decorator
@@ -37,9 +42,15 @@ export class AngularParser {
                 const callExpr = node.expression;
 
                 if (callExpr.expression.getText() === 'Component') {
+                    console.log("🎯 [Parser] Encontrado @Component en", filePath);
                     const arg = callExpr.arguments[0];
                     if (ts.isObjectLiteralExpression(arg)) {
                         for (const prop of arg.properties) {
+
+                            const propName = prop.name?.getText() ?? "";
+
+                            console.log("   🔧 [Parser] Propiedad:", propName);
+
 
                             // selector: 'app-test'
                             if (
@@ -47,6 +58,7 @@ export class AngularParser {
                                 prop.name.getText() === 'selector'
                             ) {
                                 selector = this.extractString(prop.initializer);
+                                console.log("   ✔ selector:", selector);
                             }
 
                             // templateUrl: './x.html'
@@ -55,6 +67,7 @@ export class AngularParser {
                                 prop.name.getText() === 'templateUrl'
                             ) {
                                 templateUrl = this.extractString(prop.initializer);
+                                console.log("   ✔ templateUrl:", templateUrl);
                             }
 
                             // template: `...`
@@ -65,6 +78,7 @@ export class AngularParser {
                             ) {
                                 template = prop.initializer.getText();
                                 template = template.slice(1, -1); // remove quotes/backticks
+                                console.log("   ✔ template inline (recortado):", template.substring(0, 60));
                             }
 
                             // imports: [CompA, CompB]
@@ -74,6 +88,7 @@ export class AngularParser {
                                 ts.isArrayLiteralExpression(prop.initializer)
                             ) {
                                 imports = prop.initializer.elements.map(el => el.getText());
+                                console.log("   ✔ imports:", imports);
                             }
                         }
                     }
@@ -87,6 +102,7 @@ export class AngularParser {
 
         // If no component decorator found → not an Angular component
         if (!selector || !className) {
+            console.warn("❌ [Parser] No es componente Angular:", filePath);
             return null;
         }
 
@@ -94,6 +110,7 @@ export class AngularParser {
         let templatePath: string | undefined = undefined;
         if (templateUrl) {
             templatePath = path.resolve(path.dirname(filePath), templateUrl);
+            console.log("📁 [Parser] templatePath absolut:", templatePath);
         }
 
         const metadata: AngularComponentMetadata = {
@@ -106,6 +123,8 @@ export class AngularParser {
             imports,
             usedSelectors: [] // filled later by TemplateParser
         };
+        console.log("✅ [Parser] Metadata final:", metadata);
+        console.log("----------------------------------------------------");
 
         return metadata;
     }

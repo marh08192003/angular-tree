@@ -1,142 +1,115 @@
-import { AngularComponentMetadata } from './types/AngularComponentMetadata';
-import { HierarchyNode } from './types/HierarchyNode';
+import { AngularComponentMetadata } from "./types/AngularComponentMetadata";
+import { HierarchyNode } from "./types/HierarchyNode";
 
-/**
- * HierarchyBuilder
- * ----------------
- * Combina relaciones:
- *  - Selectores detectados en plantillas
- *  - imports[] de standalone components
- *  - Rutas detectadas en RouterResolver
- * Además, conecta <router-outlet> con los componentes de rutas.
- */
 export class HierarchyBuilder {
 
-    public buildHierarchy(
+    /**
+     * Construye el árbol jerárquico final combinando:
+     *  - relaciones por selectores (child components usados en templates)
+     *  - relaciones por imports (standalone imports)
+     *  - relaciones por rutas (Angular router)
+     */
+    buildHierarchy(
         allMetadata: AngularComponentMetadata[],
         selectorRelations: Map<string, string[]>,
         importRelations: Map<string, string[]>,
         routeRelations: Map<string, string[]>
     ): HierarchyNode | null {
 
-        if (allMetadata.length === 0) return null;
+        console.log("🟦 [HierarchyBuilder] Construyendo árbol...");
+        console.log("📌 selectorRelations:", Object.fromEntries(selectorRelations));
+        console.log("📌 importRelations:", Object.fromEntries(importRelations));
+        console.log("📌 routeRelations (antes FIX):", Object.fromEntries(routeRelations));
 
-        console.log("🏗 [HierarchyBuilder] Construyendo árbol...");
-
-        // ---------------------------------------------------------------------
-        // 1. Crear lookup id -> metadata
-        // ---------------------------------------------------------------------
-        const idToMeta = new Map<string, AngularComponentMetadata>();
-        for (const meta of allMetadata) {
-            idToMeta.set(meta.id, meta);
+        // ------------------------------------------------------------
+        // 1. Encontrar el componente raíz (app-root)
+        // ------------------------------------------------------------
+        const appRoot = allMetadata.find(m => m.selector === "app-root");
+        if (!appRoot) {
+            console.error("❌ No se encontró componente con selector app-root");
+            return null;
         }
 
-        // ---------------------------------------------------------------------
-        // 2. Combinar TODAS las relaciones en un solo mapa
-        //    Map<parentId -> Set<childIds>>
-        // ---------------------------------------------------------------------
-        const combinedRelations = new Map<string, Set<string>>();
+        console.log(`🌳 [HierarchyBuilder] Root: ${appRoot.selector} ${appRoot.className}`);
 
-        const addRelations = (map: Map<string, string[]>, label: string) => {
-            console.log(`📌 [HierarchyBuilder] Añadiendo relaciones desde ${label}`);
-            for (const [parentId, childList] of map.entries()) {
+        // ------------------------------------------------------------
+        // 2. FIX: Convertir routeRelations["root"] en hijos del app-root
+        // ------------------------------------------------------------
+        const rootRouteChildren = routeRelations.get("root");
 
-                if (!combinedRelations.has(parentId)) {
-                    combinedRelations.set(parentId, new Set());
-                }
-                const set = combinedRelations.get(parentId)!;
+        if (rootRouteChildren && rootRouteChildren.length > 0) {
+            console.log("📌 [HierarchyBuilder] Rutas detectadas bajo clave 'root':", rootRouteChildren);
 
-                for (const childId of childList) {
-                    set.add(childId);
-                    console.log(`   ➕ ${label}: ${parentId} -> ${childId}`);
-                }
+            const existingForAppRoot = routeRelations.get(appRoot.id) ?? [];
+            const merged = [...existingForAppRoot, ...rootRouteChildren];
+
+            routeRelations.set(appRoot.id, merged);
+            routeRelations.delete("root");
+
+            console.log("📌 [HierarchyBuilder] Rutas reasignadas a AppComponent:", merged);
+        } else {
+            console.log("ℹ️ [HierarchyBuilder] No existen rutas en 'root'.");
+        }
+
+        console.log("📌 routeRelations (después FIX):", Object.fromEntries(routeRelations));
+
+        // ------------------------------------------------------------
+        // 3. Combinar todas las relaciones en un solo mapa
+        // ------------------------------------------------------------
+        const combinedRelations = new Map<string, string[]>();
+
+        const addRelations = (from: Map<string, string[]>, label: string) => {
+            console.log(`🔧 Añadiendo relaciones de tipo ${label}`);
+            for (const [parentId, childrenIds] of from.entries()) {
+                console.log(`   ${parentId} ->`, childrenIds);
+
+                const current = combinedRelations.get(parentId) ?? [];
+                combinedRelations.set(parentId, [...current, ...childrenIds]);
             }
         };
 
-        addRelations(selectorRelations, "selectors");
+        addRelations(selectorRelations, "selectores");
         addRelations(importRelations, "imports");
-        addRelations(routeRelations, "routes");
+        addRelations(routeRelations, "rutas");
 
-        // ---------------------------------------------------------------------
-        // 2.5. Conectar router-outlet con las rutas detectadas
-        // ---------------------------------------------------------------------
-        const routeRootIds = routeRelations.get("root") ?? [];
+        console.log("🌳 [HierarchyBuilder] Relaciones combinadas:", Object.fromEntries(combinedRelations));
 
-        console.log("🔍 [HierarchyBuilder] Rutas raíz detectadas:", routeRootIds);
-
-        for (const meta of allMetadata) {
-            if (meta.usedSelectors.includes("router-outlet")) {
-
-                console.log(`🔗 [HierarchyBuilder] Conectando router-outlet en ${meta.className}`);
-
-                if (!combinedRelations.has(meta.id)) {
-                    combinedRelations.set(meta.id, new Set());
-                }
-
-                const set = combinedRelations.get(meta.id)!;
-
-                for (const routeId of routeRootIds) {
-                    console.log(`   📎 router-outlet -> ${routeId}`);
-                    set.add(routeId);
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // 3. Determinar raíz del árbol
-        // ---------------------------------------------------------------------
-        let rootMeta =
-            allMetadata.find(m => m.selector === 'app-root') ||
-            allMetadata[0];
-
-        console.log("🌳 [HierarchyBuilder] Root:", rootMeta.selector, rootMeta.className);
-
-        // ---------------------------------------------------------------------
-        // 4. Función recursiva para construir el árbol (evita ciclos)
-        // ---------------------------------------------------------------------
-        const buildNode = (meta: AngularComponentMetadata, visited = new Set<string>()): HierarchyNode => {
-
-            if (visited.has(meta.id)) {
+        // ------------------------------------------------------------
+        // 4. Construcción recursiva del árbol final
+        // ------------------------------------------------------------
+        const buildNode = (id: string): HierarchyNode => {
+            const meta = allMetadata.find(m => m.id === id);
+            if (!meta) {
+                console.warn("⚠️ [HierarchyBuilder] ID sin metadata:", id);
                 return {
-                    id: meta.id,
-                    name: meta.className,
-                    selector: meta.selector,
-                    filePath: meta.filePath,
+                    id,
+                    name: "Unknown",
+                    selector: "unknown",
+                    filePath: "",
                     children: []
                 };
             }
-            visited.add(meta.id);
 
-            const childIds = combinedRelations.get(meta.id) ?? new Set();
-            const childrenNodes: HierarchyNode[] = [];
+            const childrenIds = combinedRelations.get(id) ?? [];
+            console.log(`📂 [HierarchyBuilder] Expand ${meta.className}:`, childrenIds);
 
-            console.log(`📂 [HierarchyBuilder] Expand ${meta.className}:`, Array.from(childIds));
-
-            for (const childId of childIds) {
-                const childMeta = idToMeta.get(childId);
-                if (!childMeta) {
-                    console.warn("⚠️ [HierarchyBuilder] childId sin metadata:", childId);
-                    continue;
-                }
-                childrenNodes.push(buildNode(childMeta, new Set(visited)));
-            }
+            const children = childrenIds.map(childId => buildNode(childId));
 
             return {
                 id: meta.id,
                 name: meta.className,
                 selector: meta.selector,
                 filePath: meta.filePath,
-                children: childrenNodes
+                children
             };
         };
 
-        // ---------------------------------------------------------------------
-        // 5. Construir árbol final
-        // ---------------------------------------------------------------------
-        const finalTree = buildNode(rootMeta);
+        // ------------------------------------------------------------
+        // 5. Devolver árbol con AppComponent como raíz
+        // ------------------------------------------------------------
+        const finalTree = buildNode(appRoot.id);
 
         console.log("✅ [HierarchyBuilder] Árbol final construido:", finalTree);
-
         return finalTree;
     }
 }
