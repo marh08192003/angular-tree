@@ -1,71 +1,106 @@
-# angular-tree README
+# Angular Tree
 
-This is the README for your extension "angular-tree". After writing up a brief description, we recommend including the following sections.
+Angular Tree is a Visual Studio Code extension that scans your Angular
+project, analyzes components, templates, selectors, imports, and routing
+configuration, and generates an interactive component hierarchy tree.
+
+This tool helps developers understand how Angular components relate to
+each other, improving navigation, architecture comprehension, code
+review, and refactoring.
+
+------------------------------------------------------------------------
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+-   Scans Angular Standalone Components automatically.
+-   Detects:
+    -   Component selectors in templates.
+    -   `imports` in standalone components.
+    -   `loadComponent()` inside route configuration.
+-   Builds a full parent → child hierarchy tree.
+-   Click any node to jump directly to its source file.
+-   Auto-refreshes the hierarchy every time you save a file.
+-   Displays the tree inside a custom WebView using D3.js.
 
-For example if there is an image subfolder under your extension project workspace:
+------------------------------------------------------------------------
 
-\!\[feature X\]\(images/feature-x.png\)
+## Usage
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1.  Open any Angular workspace.\
+2.  Run the command:
+
+```{=html}
+<!-- -->
+```
+    Angular Tree: Show Angular Hierarchy Tree
+
+3.  A WebView panel will open showing the hierarchical structure of your
+    component tree.
+4.  Click any component in the tree to open its `.ts` source file.
+
+------------------------------------------------------------------------
+
+## Commands
+
+  --------------------------------------------------------------------------
+  Command                        Description
+  ------------------------------ -------------------------------------------
+  `angular-tree.showHierarchy`   Opens the Angular hierarchy tree view.
+
+  `angular-tree.helloWorld`      Sample command.
+  --------------------------------------------------------------------------
+
+------------------------------------------------------------------------
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+No additional configuration is required.\
+Works automatically with Angular Standalone Components.
+
+Supported patterns:
+
+-   `@Component({ selector })`
+-   `imports: [...]`
+-   `<component-selector></component-selector>`
+-   Route lazy loading:
+
+``` ts
+{
+  path: '',
+  loadComponent: () => import('./path/to/component')
+}
+```
+
+------------------------------------------------------------------------
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+This extension does not currently expose configuration settings.
 
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+------------------------------------------------------------------------
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+-   Does not yet detect dynamic components created via
+    `ViewContainerRef`.
+-   Does not analyze directives or pipes hierarchy.
+-   Only supports Angular Standalone; modules are ignored.
+
+------------------------------------------------------------------------
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
+-   Initial release.\
+-   Full standalone Angular hierarchy detection.\
+-   Template selector scanning.\
+-   Import scanning.\
+-   Route resolver support.\
+-   Interactive D3.js tree renderer.
 
-Initial release of ...
+------------------------------------------------------------------------
 
-### 1.0.1
+## License
 
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+MIT License.
