@@ -1,6 +1,8 @@
 // Webview API (envía mensajes al backend)
 const vscode = acquireVsCodeApi();
 
+console.log("[Webview] main.js loaded");
+
 // DOM references
 const treeRoot = document.getElementById('tree-root');
 const title = document.getElementById('title');
@@ -12,28 +14,48 @@ treeRoot.innerHTML = `
     </div>
 `;
 
-// Listen for messages from extension host
+console.log("[Webview] Showing loading state");
+
+// -----------------------------
+// Notify backend when ready
+// -----------------------------
+window.addEventListener('DOMContentLoaded', () => {
+    console.log("[Webview] DOMContentLoaded → sending READY to backend");
+    vscode.postMessage({ type: 'ready' });
+});
+
+// -----------------------------
+// Listen for messages from backend
+// -----------------------------
 window.addEventListener('message', event => {
     const message = event.data;
 
-    if (!message || !message.type) return;
+    console.log("[Webview] Message received:", message);
+
+    if (!message || !message.type) {
+        console.warn("[Webview] Message without type");
+        return;
+    }
 
     switch (message.type) {
 
         case 'treeData':
+            console.log("[Webview] Received treeData");
             renderHierarchy(message.payload);
             break;
 
         default:
-            console.warn('Unknown message received:', message);
+            console.warn("[Webview] Unknown message received:", message);
             break;
     }
 });
 
 /**
- * Renders the tree hierarchy using TreeRenderer.
+ * Render the Angular hierarchy using TreeRenderer
  */
 function renderHierarchy(tree) {
+    console.log("[Webview] renderHierarchy() called", tree);
+
     if (!tree) {
         treeRoot.innerHTML = `<p class="error">No hierarchy data received.</p>`;
         return;
@@ -41,13 +63,16 @@ function renderHierarchy(tree) {
 
     // Clear container
     treeRoot.innerHTML = '';
+    console.log("[Webview] container cleared, calling TreeRenderer");
 
     try {
         // TreeRenderer is loaded as a global class
         TreeRenderer.render(tree, treeRoot, vscode);
 
+        console.log("[Webview] TreeRenderer.render() completed");
+
     } catch (err) {
-        console.error('[AngularTree] Render error:', err);
+        console.error('[Webview] Render error:', err);
         treeRoot.innerHTML = `
             <p class="error">Error rendering tree. Check console.</p>
         `;
