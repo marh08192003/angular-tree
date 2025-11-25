@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import * as ts from "typescript";
 import * as path from "path";
 import * as fs from "fs";
@@ -6,210 +5,156 @@ import { AngularComponentMetadata } from "./types/AngularComponentMetadata";
 
 export class RouterResolver {
 
-    /**
-     * Analiza todas las rutas Angular en el workspace y devuelve un Map:
-     *
-     *    Map<string, string[]> donde:
-     *       - "root" → rutas top-level
-     *       - "<componentId>" → rutas hijas
-     */
-    async resolveRoutes(allMetadata: AngularComponentMetadata[], workspaceRoot: string) {
-        console.log("🔍 [RouterResolver] Resolviendo rutas...");
+    async resolveRoutes(
+        allMetadata: AngularComponentMetadata[],
+        workspaceRoot: string
+    ): Promise<Record<string, string[]>> {
+
+        console.log("🔍 [RouterResolver] ====== INICIO RESOLVER RUTAS ======");
         console.log("📁 Workspace root:", workspaceRoot);
 
         const routes: Record<string, string[]> = {};
 
+        // Mapa rápido filePath → componentId
         const fileToComponentId = new Map<string, string>();
-        allMetadata.forEach(c => {
-            const normalized = path.normalize(c.filePath).replace(/\\/g, "/");
-            fileToComponentId.set(normalized, c.id);
-            console.log("📌 [RouterResolver] Mapeado componente:", {
-                file: normalized,
-                id: c.id,
-                name: c.className
-            });
+        console.log("📌 [RouterResolver] Mapeando metadata...");
+
+        allMetadata.forEach(m => {
+            const normalized = m.filePath.replace(/\\/g, "/").toLowerCase();
+            fileToComponentId.set(normalized, m.id);
+            console.log("   •", normalized, "→", m.id);
         });
 
-        const angularRoot = path.join(workspaceRoot, "src", "app");
-        const routeFiles = await this.findRouteFiles(angularRoot);
-        console.log("📄 [RouterResolver] Archivos de rutas encontrados:", routeFiles);
+        // Limitar búsqueda
+        const appRoot = path.join(workspaceRoot, "src", "app");
+        console.log("📂 Directorio objetivo para buscar rutas:", appRoot);
+
+        const routeFiles = await this.findRouteFiles(appRoot);
+
+        console.log("📄 Archivos .routes.ts encontrados:", routeFiles);
+
+        const routeRelations = new Map<string, string[]>();
 
         for (const file of routeFiles) {
-            console.log("➡️ [RouterResolver] Analizando archivo de rutas:", file);
-
-            const content = fs.readFileSync(file, "utf8");
-            const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true);
-
-            ts.forEachChild(source, node => {
-                if (!ts.isVariableStatement(node)) return;
-
-                for (const decl of node.declarationList.declarations) {
-                    if (!decl.initializer) continue;
-                    if (!ts.isArrayLiteralExpression(decl.initializer)) continue;
-
-                    console.log("🧩 [RouterResolver] Analizando arreglo de rutas ...");
-
-                    decl.initializer.elements.forEach(elem => {
-                        if (!ts.isObjectLiteralExpression(elem)) return;
-
-                        elem.properties.forEach(p => {
-
-                            if (
-                                ts.isPropertyAssignment(p) &&
-                                p.name.getText() === "loadComponent"
-                            ) {
-                                console.log("🚦 [RouterResolver] loadComponent detectado");
-
-                                const init = p.initializer;
-
-                                if (
-                                    ts.isArrowFunction(init) &&
-                                    ts.isCallExpression(init.body)
-                                ) {
-                                    const body = init.body;
-
-                                    if (body.expression.getText() === "import") {
-                                        const importArg = body.arguments[0];
-
-                                        if (ts.isStringLiteral(importArg)) {
-                                            const importPath = importArg.text;
-
-                                            console.log("📥 [RouterResolver] Ruta detectada en import():", importPath);
-
-                                            const abs = path
-                                                .resolve(path.dirname(file), importPath + ".ts")
-                                                .replace(/\\/g, "/");
-
-                                            console.log("📌 [RouterResolver] Archivo real del componente:", abs);
-
-                                            const compId = fileToComponentId.get(abs);
-
-                                            if (compId) {
-                                                console.log("✅ [RouterResolver] Componente encontrado:", compId);
-
-                                                if (!routes["root"]) {
-                                                    routes["root"] = [];
-                                                }
-
-                                                routes["root"].push(compId);
-                                            } else {
-                                                console.warn("❌ [RouterResolver] Sin metadata para:", abs);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    });
-                }
-            });
+            console.log("➡️ [RouterResolver] === Analizando archivo:", file, "===");
+            await this.processRouteFile(file, allMetadata, routeRelations);
         }
 
-        console.log("🌳 [RouterResolver] Relaciones finales:", routes);
+        console.log("🔄 Transformando relations Map → Record");
 
+        for (const [k, v] of routeRelations.entries()) {
+            console.log("   •", k, "→", v);
+            routes[k] = v;
+        }
+
+        console.log("🌳 [RouterResolver] ====== FIN RESOLVER RUTAS ======");
         return routes;
     }
 
     // -------------------------------------------------------------------------
-    // Buscar archivos *.routes.ts en todo el workspace
+    // Buscar archivos *.routes.ts
     // -------------------------------------------------------------------------
-    private findRouteFiles(root: string): string[] {
+    private async findRouteFiles(root: string): Promise<string[]> {
         const results: string[] = [];
 
-        console.log("🔎 [RouterResolver] Buscando archivos *.routes.ts en:", root);
+        console.log("🔎 [RouterResolver] Buscando archivos de rutas desde:", root);
 
         const walk = async (dir: string) => {
             let items: string[];
-
             try {
                 items = await fs.promises.readdir(dir);
-            } catch {
+            } catch (err) {
+                console.warn("⚠️ No se pudo leer dir:", dir);
                 return;
             }
 
             for (const f of items) {
                 const full = path.join(dir, f);
-
+                let stat;
                 try {
-                    const stat = await fs.promises.stat(full);
+                    stat = await fs.promises.stat(full);
+                } catch {
+                    continue;
+                }
 
-                    if (stat.isDirectory()) {
-                        walk(full);
-                    } else if (f.endsWith(".routes.ts")) {
-                        const normalized = full.replace(/\\/g, "/");
-                        console.log("📌 [RouterResolver] Archivo de rutas encontrado:", normalized);
-                        results.push(normalized);
-                    }
-                } catch { }
+                if (stat.isDirectory()) {
+                    await walk(full);
+                } else if (f.endsWith(".routes.ts")) {
+                    const normalized = full.replace(/\\/g, "/");
+                    console.log("   📌 Encontrado:", normalized);
+                    results.push(normalized);
+                }
             }
         };
 
-        walk(root);
+        await walk(root);
         return results;
     }
 
-
-
     // -------------------------------------------------------------------------
-    // PROCESAR ARCHIVO DE RUTAS
+    // Procesar archivo de rutas
     // -------------------------------------------------------------------------
     private async processRouteFile(
         filePath: string,
-        workspaceRoot: string,
         allMetadata: AngularComponentMetadata[],
         routeRelations: Map<string, string[]>
     ) {
-        console.log("➡️ [RouterResolver] Analizando archivo de rutas:", filePath);
 
-        const fileContent = fs.readFileSync(filePath, "utf8");
-        const sourceFile = ts.createSourceFile(filePath, fileContent, ts.ScriptTarget.Latest, true);
+        console.log("📄 [RouterResolver] Leyendo archivo de rutas:", filePath);
 
-        // Buscar export const routes: Routes = [...]
+        const content = await fs.promises.readFile(filePath, "utf8");
+        const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+
+        console.log("🔎 Buscando 'export const routes = [...]'");
+
         const routesArray = this.findRoutesArray(sourceFile);
 
         if (!routesArray) {
-            console.warn("⚠️ [RouterResolver] No se encontró arreglo de rutas en:", filePath);
+            console.warn("⚠️ No se encontró arreglo de rutas en:", filePath);
             return;
         }
 
-        console.log("🧩 [RouterResolver] Analizando arreglo de rutas ...");
+        console.log("🧩 Analizando elementos del arreglo de rutas... count =", routesArray.elements.length);
 
-        const topLevelRoutes: string[] = [];
+        const topLevel: string[] = [];
 
-        for (const routeNode of routesArray.elements ?? []) {
-            const childId = this.processRouteNode(
-                routeNode,
+        for (const element of routesArray.elements) {
+            const id = this.processRouteNode(
+                element,
                 path.dirname(filePath),
-                workspaceRoot,
                 allMetadata,
                 routeRelations
             );
 
-            if (childId) {
-                topLevelRoutes.push(childId);
-            }
+            console.log("   → Resultado parse nodo:", id);
+
+            if (id) topLevel.push(id);
         }
 
-        if (topLevelRoutes.length > 0) {
-            routeRelations.set("root", topLevelRoutes);
+        if (topLevel.length > 0) {
+            console.log("📌 Asignando rutas top-level:", topLevel);
+            routeRelations.set("root", topLevel);
         }
     }
 
     // -------------------------------------------------------------------------
-    // ENCONTRAR "export const routes = [...]"
+    // Encontrar "routes = [...]"
     // -------------------------------------------------------------------------
     private findRoutesArray(sourceFile: ts.SourceFile): ts.ArrayLiteralExpression | null {
         let found: ts.ArrayLiteralExpression | null = null;
 
         const visit = (node: ts.Node) => {
+
             if (
                 ts.isVariableDeclaration(node) &&
                 node.name.getText() === "routes" &&
                 node.initializer &&
                 ts.isArrayLiteralExpression(node.initializer)
             ) {
+                console.log("✔️ Arreglo de rutas encontrado.");
                 found = node.initializer;
             }
+
             ts.forEachChild(node, visit);
         };
 
@@ -218,132 +163,123 @@ export class RouterResolver {
     }
 
     // -------------------------------------------------------------------------
-    // PROCESAR UN NODO DE RUTA
+    // Procesar un nodo de ruta
     // -------------------------------------------------------------------------
     private processRouteNode(
         node: ts.Node,
-        routeFileDir: string,
-        workspaceRoot: string,
+        routeDir: string,
         allMetadata: AngularComponentMetadata[],
-        routeRelations: Map<string, string[]>
+        relations: Map<string, string[]>
     ): string | null {
 
-        if (!ts.isObjectLiteralExpression(node)) return null;
+        if (!ts.isObjectLiteralExpression(node)) {
+            console.warn("⚠️ Nodo ignorado (no es ObjectLiteral)");
+            return null;
+        }
 
         let componentId: string | null = null;
-        let childrenIds: string[] = [];
+        const childIds: string[] = [];
+
+        console.log("🔍 Procesando nodo de ruta...");
 
         for (const prop of node.properties) {
             if (!ts.isPropertyAssignment(prop)) continue;
 
             const key = prop.name.getText();
+            console.log("   Propiedad detectada:", key);
 
-            // ---------------------------------------------
-            // Caso 1: loadComponent: () => import("...")
-            // ---------------------------------------------
+            // loadComponent
             if (key === "loadComponent") {
-                const loaded = this.extractLoadComponent(prop.initializer, routeFileDir, workspaceRoot, allMetadata);
+                componentId = this.extractLoadComponent(prop.initializer, routeDir, allMetadata);
 
-                if (loaded) {
-                    console.log("📌 [RouterResolver] Componente cargado:", loaded);
-                    componentId = loaded;
-                }
+                console.log("   → loadComponent →", componentId);
+
+                continue;
             }
 
-            // ---------------------------------------------
-            // Caso 2: children: [ ... ]
-            // ---------------------------------------------
+            // children
             if (key === "children" && ts.isArrayLiteralExpression(prop.initializer)) {
-                console.log("🔎 [RouterResolver] Detectado children[]");
+                console.log("   → children[] detectado. Procesando hijos...");
 
                 for (const childRoute of prop.initializer.elements) {
-                    const childResolved = this.processRouteNode(
-                        childRoute,
-                        routeFileDir,
-                        workspaceRoot,
-                        allMetadata,
-                        routeRelations
-                    );
-
-                    if (childResolved) {
-                        childrenIds.push(childResolved);
-                    }
+                    const childId = this.processRouteNode(childRoute, routeDir, allMetadata, relations);
+                    console.log("      → childId:", childId);
+                    if (childId) childIds.push(childId);
                 }
             }
         }
 
-        // ------------------------------------------------------
-        // Guardar relaciones padre → hijos
-        // ------------------------------------------------------
         if (componentId) {
-            if (childrenIds.length > 0) {
-                routeRelations.set(componentId, childrenIds);
+            if (childIds.length > 0) {
+                console.log("📌 Guardando relaciones hijos:", componentId, "=>", childIds);
+                relations.set(componentId, childIds);
             }
+
             return componentId;
         }
 
+        console.warn("⚠️ Nodo sin loadComponent → ignorado.");
         return null;
     }
 
     // -------------------------------------------------------------------------
-    // EXTRAER ID DE loadComponent()
+    // Extraer loadComponent(() => import("..."))
     // -------------------------------------------------------------------------
     private extractLoadComponent(
         node: ts.Expression,
-        routeFileDir: string,
-        workspaceRoot: string,
+        routeDir: string,
         allMetadata: AngularComponentMetadata[]
     ): string | null {
 
-        // Debe ser una arrow function: () => import('...')
-        if (!ts.isArrowFunction(node)) return null;
+        console.log("🔎 Analizando loadComponent...");
 
-        const body = node.body;
-
-        // Body debe ser un CallExpression
-        if (!ts.isCallExpression(body)) return null;
-
-        const callExpr = body;
-
-        // Verificar que sea import(...)
-        // TS AST: callExpr.expression.kind === SyntaxKind.ImportKeyword
-        if (callExpr.expression.kind !== ts.SyntaxKind.ImportKeyword) {
-            console.log("❌ [RouterResolver] No es un import() válido.");
+        if (!ts.isArrowFunction(node)) {
+            console.warn("   ⚠️ No es arrow function.");
             return null;
         }
 
-        // Extraer argumentos del import()
-        const args = callExpr.arguments;
-        if (!args || args.length === 0) {
-            console.warn("⚠️ [RouterResolver] import() sin argumentos.");
+        const body = node.body;
+
+        if (!ts.isCallExpression(body)) {
+            console.warn("   ⚠️ Body no es CallExpression.");
+            return null;
+        }
+
+        if (body.expression.kind !== ts.SyntaxKind.ImportKeyword) {
+            console.warn("   ⚠️ Llamada no es import().");
+            return null;
+        }
+
+        const args = body.arguments;
+
+        if (!args.length) {
+            console.warn("   ⚠️ import() sin argumentos.");
             return null;
         }
 
         const importArg = args[0];
 
         if (!ts.isStringLiteral(importArg)) {
-            console.warn("⚠️ [RouterResolver] Argumento import() no es string.");
+            console.warn("   ⚠️ import() argumento no es string.");
             return null;
         }
 
-        const relativeImportPath = importArg.text;
-        console.log("📥 [RouterResolver] Ruta en import():", relativeImportPath);
+        console.log("   ✔️ import path detectado:", importArg.text);
 
-        // Resolver archivo real
-        const resolvedPath = path.resolve(routeFileDir, relativeImportPath + ".ts");
+        const realPath = path.resolve(routeDir, importArg.text + ".ts");
+        const normalized = realPath.replace(/\\/g, "/").toLowerCase();
 
-        console.log("📌 [RouterResolver] Archivo real del componente:", resolvedPath);
+        console.log("   → Path absoluto:", normalized);
 
-        const meta = allMetadata.find(m => m.filePath === resolvedPath);
+        const meta = allMetadata.find(m => m.filePath.replace(/\\/g, "/").toLowerCase() === normalized);
+
 
         if (!meta) {
-            console.warn("⚠️ [RouterResolver] No se encontró metadata:", resolvedPath);
+            console.warn("   ❌ No se encontró metadata para:", normalized);
             return null;
         }
 
-        console.log("✅ [RouterResolver] Componente encontrado:", meta.id);
-
+        console.log("   ✔️ Componente encontrado:", meta.id);
         return meta.id;
     }
-
 }

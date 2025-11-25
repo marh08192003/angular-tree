@@ -64,7 +64,14 @@ export class HierarchyBuilder {
                 console.log(`   ${parentId} ->`, childrenIds);
 
                 const current = combinedRelations.get(parentId) ?? [];
-                combinedRelations.set(parentId, [...current, ...childrenIds]);
+                const merged = [...current];
+
+                for (const c of childrenIds) {
+                    if (!merged.includes(c)) merged.push(c);
+                }
+
+                combinedRelations.set(parentId, merged);
+
             }
         };
 
