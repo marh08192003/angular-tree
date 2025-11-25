@@ -13,7 +13,7 @@ export class RouterResolver {
      *       - "root" → rutas top-level
      *       - "<componentId>" → rutas hijas
      */
-    resolveRoutes(allMetadata: AngularComponentMetadata[], workspaceRoot: string) {
+    async resolveRoutes(allMetadata: AngularComponentMetadata[], workspaceRoot: string) {
         console.log("🔍 [RouterResolver] Resolviendo rutas...");
         console.log("📁 Workspace root:", workspaceRoot);
 
@@ -30,7 +30,8 @@ export class RouterResolver {
             });
         });
 
-        const routeFiles = this.findRouteFiles(workspaceRoot);
+        const angularRoot = path.join(workspaceRoot, "src", "app");
+        const routeFiles = await this.findRouteFiles(angularRoot);
         console.log("📄 [RouterResolver] Archivos de rutas encontrados:", routeFiles);
 
         for (const file of routeFiles) {
@@ -117,11 +118,11 @@ export class RouterResolver {
 
         console.log("🔎 [RouterResolver] Buscando archivos *.routes.ts en:", root);
 
-        const walk = (dir: string) => {
+        const walk = async (dir: string) => {
             let items: string[];
 
             try {
-                items = fs.readdirSync(dir);
+                items = await fs.promises.readdir(dir);
             } catch {
                 return;
             }
@@ -130,7 +131,7 @@ export class RouterResolver {
                 const full = path.join(dir, f);
 
                 try {
-                    const stat = fs.statSync(full);
+                    const stat = await fs.promises.stat(full);
 
                     if (stat.isDirectory()) {
                         walk(full);
