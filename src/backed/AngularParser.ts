@@ -32,10 +32,19 @@ export class AngularParser {
         const visit = (node: ts.Node) => {
 
             // Extract class name
-            if (ts.isClassDeclaration(node) && node.name) {
-                className = node.name.text;
-                console.log("📌 [Parser] className:", className);
+            if (ts.isClassDeclaration(node)) {
+
+                if (node.name) {
+                    // class MyComp {}
+                    className = node.name.text;
+                } else {
+                    // export default class {}
+                    const defaultName = path.basename(filePath).replace('.component.ts', '') + 'Class';
+                    className = defaultName;
+                    console.log("⚠️ [Parser] Clase sin nombre. Generando nombre:", className);
+                }
             }
+
 
             // Look for @Component decorator
             if (ts.isDecorator(node) && ts.isCallExpression(node.expression)) {
