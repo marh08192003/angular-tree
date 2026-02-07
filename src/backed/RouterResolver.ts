@@ -40,7 +40,7 @@ export class RouterResolver {
             await this.processRouteFile(file, allMetadata, routeRelations);
         }
 
-        console.log("🔄 Transformando relations Map → Record");
+        console.log("🧪 [RouterResolver] RELATIONS MAP:", routeRelations);
 
         for (const [k, v] of routeRelations.entries()) {
             console.log("   •", k, "→", v);
@@ -79,7 +79,9 @@ export class RouterResolver {
 
                 if (stat.isDirectory()) {
                     await walk(full);
-                } else if (f.endsWith(".routes.ts")) {
+                } else if (f.includes("routes") && f.endsWith(".ts")) {
+
+
                     const normalized = full.replace(/\\/g, "/");
                     console.log("   📌 Encontrado:", normalized);
                     results.push(normalized);
@@ -116,25 +118,19 @@ export class RouterResolver {
 
         console.log("🧩 Analizando elementos del arreglo de rutas... count =", routesArray.elements.length);
 
-        const topLevel: string[] = [];
+        const appComponent = allMetadata.find(m => m.selector === 'app-root');
+        if (!appComponent) return;
 
         for (const element of routesArray.elements) {
-            const id = this.processRouteNode(
+            this.processRouteNode(
                 element,
                 path.dirname(filePath),
                 allMetadata,
-                routeRelations
+                routeRelations,
+                appComponent.id
             );
-
-            console.log("   → Resultado parse nodo:", id);
-
-            if (id) topLevel.push(id);
         }
 
-        if (topLevel.length > 0) {
-            console.log("📌 Asignando rutas top-level:", topLevel);
-            routeRelations.set("root", topLevel);
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -169,76 +165,61 @@ export class RouterResolver {
         node: ts.Node,
         routeDir: string,
         allMetadata: AngularComponentMetadata[],
-        relations: Map<string, string[]>
+        relations: Map<string, string[]>,
+        parentId?: string
     ): string | null {
 
-        if (!ts.isObjectLiteralExpression(node)) {
-            console.warn("⚠️ Nodo ignorado (no es ObjectLiteral)");
-            return null;
-        }
+        if (!ts.isObjectLiteralExpression(node)) return null;
 
         let componentId: string | null = null;
-        const childIds: string[] = [];
+        let childrenNode: ts.ArrayLiteralExpression | null = null;
 
-        console.log("🔍 Procesando nodo de ruta...");
-
+        // 1️⃣ Primera pasada: resolver componente
         for (const prop of node.properties) {
             if (!ts.isPropertyAssignment(prop)) continue;
 
             const key = prop.name.getText();
-            console.log("   Propiedad detectada:", key);
 
-            // loadComponent
             if (key === "loadComponent") {
                 componentId = this.extractLoadComponent(prop.initializer, routeDir, allMetadata);
-
-                console.log("   → loadComponent →", componentId);
-
-                continue;
             }
 
-            // children
-            if (key === "children" && ts.isArrayLiteralExpression(prop.initializer)) {
-                console.log("   → children[] detectado. Procesando hijos...");
-
-                for (const childRoute of prop.initializer.elements) {
-                    const childId = this.processRouteNode(childRoute, routeDir, allMetadata, relations);
-                    console.log("      → childId:", childId);
-                    if (childId) childIds.push(childId);
-                }
-            }
-
-            // component (NO lazy)
             if (key === "component") {
                 const componentName = prop.initializer.getText();
+                const meta = allMetadata.find(m => m.className === componentName);
+                if (meta) componentId = meta.id;
+            }
 
-                const meta = allMetadata.find(
-                    m => m.className === componentName
+            if (key === "children" && ts.isArrayLiteralExpression(prop.initializer)) {
+                childrenNode = prop.initializer;
+            }
+        }
+
+        // 2️⃣ Enlazar con el padre
+        if (componentId && parentId) {
+            const children = relations.get(parentId) ?? [];
+            if (!children.includes(componentId)) {
+                children.push(componentId);
+                relations.set(parentId, children);
+            }
+        }
+
+        // 3️⃣ Procesar hijos DESPUÉS
+        if (childrenNode) {
+            for (const child of childrenNode.elements) {
+                this.processRouteNode(
+                    child,
+                    routeDir,
+                    allMetadata,
+                    relations,
+                    componentId ?? parentId
                 );
-
-                if (meta) {
-                    componentId = meta.id;
-                    console.log("   ✔ component detectado:", componentName, "→", componentId);
-                } else {
-                    console.warn("   ⚠ component sin metadata:", componentName);
-                }
-
-                continue;
             }
         }
 
-        if (componentId) {
-            if (childIds.length > 0) {
-                console.log("📌 Guardando relaciones hijos:", componentId, "=>", childIds);
-                relations.set(componentId, childIds);
-            }
-
-            return componentId;
-        }
-
-        console.warn("⚠️ Nodo sin loadComponent → ignorado.");
-        return null;
+        return componentId;
     }
+
 
     // -------------------------------------------------------------------------
     // Extraer loadComponent(() => import("..."))

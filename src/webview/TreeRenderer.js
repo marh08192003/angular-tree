@@ -34,17 +34,6 @@ class TreeRenderer {
         root.x0 = height / 2;
         root.y0 = 0;
 
-        // Collapse all nodes initially except root
-        root.children?.forEach(collapse);
-
-        function collapse(node) {
-            if (node.children) {
-                node._children = node.children;
-                node._children.forEach(collapse);
-                node.children = null;
-            }
-        }
-
         const treeLayout = d3.tree().nodeSize([40, 200]);
 
         update(root);
@@ -134,25 +123,12 @@ class TreeRenderer {
         // NODE CLICK HANDLER
         // ----------------------------------------
         function onNodeClick(event, d) {
-
-            if (d.children) {
-                // collapse
-                d._children = d.children;
-                d.children = null;
-            } else {
-                // expand
-                d.children = d._children;
-                d._children = null;
-            }
-
-            update(d);
-
-            // notify VSCode
             vscode.postMessage({
                 type: "openFile",
                 payload: d.data.filePath
             });
         }
+
 
         // ----------------------------------------
         // LINK SHAPE
