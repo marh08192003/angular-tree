@@ -1,80 +1,45 @@
-// Webview API (envía mensajes al backend)
 const vscode = acquireVsCodeApi();
 
 console.log("[Webview] main.js loaded");
 
-// DOM references
-const treeRoot = document.getElementById('tree-root');
-const title = document.getElementById('title');
+window.addEventListener("DOMContentLoaded", () => {
 
-// Show loading indicator initially
-treeRoot.innerHTML = `
-    <div class="loading">
+    const treeRoot = document.getElementById("tree-root");
+    const savedState = vscode.getState();
+
+    // 1️⃣ Si hay estado → render inmediato
+    if (savedState?.tree) {
+        console.log("[Webview] Restoring tree from persisted state");
+        treeRoot.innerHTML = "";
+        TreeRenderer.render(savedState.tree, treeRoot, vscode);
+        return;
+    }
+
+    // 2️⃣ Si NO hay estado → loading + pedir data
+    console.log("[Webview] No state found → requesting data");
+
+    treeRoot.innerHTML = `
+      <div class="loading">
         <p>Loading Angular hierarchy...</p>
-    </div>
-`;
+      </div>
+    `;
 
-console.log("[Webview] Showing loading state");
-
-// -----------------------------
-// Notify backend when ready
-// -----------------------------
-window.addEventListener('DOMContentLoaded', () => {
-    console.log("[Webview] DOMContentLoaded → sending READY to backend");
-    vscode.postMessage({ type: 'ready' });
+    vscode.postMessage({ type: "ready" });
 });
 
-// -----------------------------
-// Listen for messages from backend
-// -----------------------------
-window.addEventListener('message', event => {
+// 3️⃣ Escuchar backend
+window.addEventListener("message", event => {
     const message = event.data;
+    if (!message?.type) return;
 
-    console.log("[Webview] Message received:", message);
+    if (message.type === "treeData") {
+        console.log("[Webview] Received treeData");
 
-    if (!message || !message.type) {
-        console.warn("[Webview] Message without type");
-        return;
-    }
+        const treeRoot = document.getElementById("tree-root");
 
-    switch (message.type) {
+        vscode.setState({ tree: message.payload });
 
-        case 'treeData':
-            console.log("[Webview] Received treeData");
-            renderHierarchy(message.payload);
-            break;
-
-        default:
-            console.warn("[Webview] Unknown message received:", message);
-            break;
+        treeRoot.innerHTML = "";
+        TreeRenderer.render(message.payload, treeRoot, vscode);
     }
 });
-
-/**
- * Render the Angular hierarchy using TreeRenderer
- */
-function renderHierarchy(tree) {
-    console.log("[Webview] renderHierarchy() called", tree);
-
-    if (!tree) {
-        treeRoot.innerHTML = `<p class="error">No hierarchy data received.</p>`;
-        return;
-    }
-
-    // Clear container
-    treeRoot.innerHTML = '';
-    console.log("[Webview] container cleared, calling TreeRenderer");
-
-    try {
-        // TreeRenderer is loaded as a global class
-        TreeRenderer.render(tree, treeRoot, vscode);
-
-        console.log("[Webview] TreeRenderer.render() completed");
-
-    } catch (err) {
-        console.error('[Webview] Render error:', err);
-        treeRoot.innerHTML = `
-            <p class="error">Error rendering tree. Check console.</p>
-        `;
-    }
-}

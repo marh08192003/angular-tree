@@ -7,7 +7,8 @@ import { ChildResolver } from './backed/ChildResolver';
 import { ImportResolver } from './backed/ImportResolver';
 import { RouterResolver } from './backed/RouterResolver';
 import { HierarchyBuilder } from './backed/HierarchyBuilder';
-import { ok } from 'assert';
+
+let panel: vscode.WebviewPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -17,155 +18,138 @@ export function activate(context: vscode.ExtensionContext) {
 		'angular-tree.showHierarchy',
 		async () => {
 
-			console.log("====================================================");
-			console.log("📡 [WebView] Generando Angular Hierarchy Tree...");
-			console.log("====================================================");
+			console.log("📡 Generando Angular Hierarchy Tree...");
 
-			try {
-				// -------------------------------------------------
-				// BACKEND PIPELINE
-				// -------------------------------------------------
-				const scanner = new AngularScanner();
-				const parser = new AngularParser();
-				const templateParser = new TemplateParser();
-				const childResolver = new ChildResolver();
-				const importResolver = new ImportResolver();
-				const routerResolver = new RouterResolver();
-				const hierarchyBuilder = new HierarchyBuilder();
+			// -------------------------------------------------
+			// BACKEND PIPELINE
+			// -------------------------------------------------
+			const scanner = new AngularScanner();
+			const parser = new AngularParser();
+			const templateParser = new TemplateParser();
+			const childResolver = new ChildResolver();
+			const importResolver = new ImportResolver();
+			const routerResolver = new RouterResolver();
+			const hierarchyBuilder = new HierarchyBuilder();
 
-				const files = await scanner.scanComponents();
-				console.log("📁 [WebView] Componentes identificados:", files.length);
+			const files = await scanner.scanComponents();
 
-				const allMetadata = [];
-
-				for (const file of files) {
-					const meta = parser.parseComponent(file);
-					if (!meta) continue;
+			const allMetadata = [];
+			for (const file of files) {
+				const meta = parser.parseComponent(file);
+				if (meta) {
 					allMetadata.push(templateParser.parseTemplate(meta));
 				}
+			}
 
-				console.log("📊 [WebView] Metadata total:", allMetadata.length);
+			const selectorRelations = childResolver.resolveChildren(allMetadata);
+			const importRelations = importResolver.resolveImports(allMetadata);
 
-				const selectorRelations = childResolver.resolveChildren(allMetadata);
-				const importRelations = importResolver.resolveImports(allMetadata);
+			const workspaceRoot =
+				vscode.workspace.workspaceFolders?.[0].uri.fsPath ?? "";
 
-				const workspaceRoot =
-					vscode.workspace.workspaceFolders?.[0].uri.fsPath ?? "";
+			const routeRelationsObj =
+				await routerResolver.resolveRoutes(allMetadata, workspaceRoot);
 
-				// ❗❗❗ FIX CRÍTICO → usar await
-				const routeRelationsObj =
-					await routerResolver.resolveRoutes(allMetadata, workspaceRoot);
+			const routeRelations = new Map<string, string[]>(
+				Object.entries(routeRelationsObj)
+			);
 
-				console.log("📦 Relaciones de rutas:", routeRelationsObj);
+			const tree = hierarchyBuilder.buildHierarchy(
+				allMetadata,
+				selectorRelations,
+				importRelations,
+				routeRelations
+			);
 
-				const routeRelations = new Map<string, string[]>(
-					Object.entries(routeRelationsObj)
+			if (!tree) {
+				vscode.window.showWarningMessage('No Angular components detected.');
+				return;
+			}
+
+			// -------------------------------------------------
+			// REUTILIZAR PANEL SI EXISTE
+			// -------------------------------------------------
+			if (panel) {
+				panel.reveal(vscode.ViewColumn.One);
+				panel.webview.postMessage({
+					type: "treeData",
+					payload: tree
+				});
+				return;
+			}
+
+			// -------------------------------------------------
+			// CREAR PANEL
+			// -------------------------------------------------
+			panel = vscode.window.createWebviewPanel(
+				'angularHierarchyView',
+				'Angular Hierarchy Tree',
+				vscode.ViewColumn.One,
+				{
+					enableScripts: true,
+					retainContextWhenHidden: true,
+					localResourceRoots: [
+						vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview')
+					]
+				}
+			);
+
+			panel.onDidDispose(() => {
+				panel = undefined;
+			});
+
+			// -------------------------------------------------
+			// HTML
+			// -------------------------------------------------
+			const webviewRoot = vscode.Uri.joinPath(
+				context.extensionUri,
+				'dist',
+				'webview'
+			);
+
+			let html = (
+				await vscode.workspace.fs.readFile(
+					vscode.Uri.joinPath(webviewRoot, 'index.html')
+				)
+			).toString();
+
+			html = html
+				.replace("{{stylesCss}}",
+					panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, 'styles.css')).toString()
+				)
+				.replace("{{d3Js}}",
+					panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, 'd3.min.js')).toString()
+				)
+				.replace("{{treeRenderer}}",
+					panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, 'TreeRenderer.js')).toString()
+				)
+				.replace("{{mainJs}}",
+					panel.webview.asWebviewUri(vscode.Uri.joinPath(webviewRoot, 'main.js')).toString()
 				);
 
-				const tree = hierarchyBuilder.buildHierarchy(
-					allMetadata,
-					selectorRelations,
-					importRelations,
-					routeRelations
-				);
+			panel.webview.html = html;
 
-				if (!tree) {
-					vscode.window.showWarningMessage(
-						'No Angular components detected.'
-					);
-					return;
+			// -------------------------------------------------
+			// MENSAJES
+			// -------------------------------------------------
+			panel.webview.onDidReceiveMessage(async msg => {
+
+				if (msg.type === 'openFile') {
+					const uri = vscode.Uri.file(msg.payload);
+					const doc = await vscode.workspace.openTextDocument(uri);
+					await vscode.window.showTextDocument(doc, { preview: false });
 				}
 
-				// -------------------------------------------------
-				// WEBVIEW PANEL
-				// -------------------------------------------------
-				const panel = vscode.window.createWebviewPanel(
-					'angularHierarchyView',
-					'Angular Hierarchy Tree',
-					vscode.ViewColumn.One,
-					{
-						enableScripts: true,
-						localResourceRoots: [
-							vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview')
-						]
-					}
-				); 
+			});
 
-				// -------------------------------------------------
-				// CARGAR HTML
-				// -------------------------------------------------
-				const webviewRoot = vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview');
+			// -------------------------------------------------
+			// ENVÍO DIRECTO (SIN READY)
+			// -------------------------------------------------
+			panel.webview.postMessage({
+				type: "treeData",
+				payload: tree
+			});
 
-				const htmlUri = vscode.Uri.joinPath(webviewRoot, 'index.html');
-
-				let html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
-
-
-				const stylesCss = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, 'styles.css')
-				);
-				const d3Js = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, 'd3.min.js')
-				);
-				const treeRenderer = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, 'TreeRenderer.js')
-				);
-				const mainJs = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, 'main.js')
-				);
-
-				html = html
-					.replace("{{stylesCss}}", stylesCss.toString())
-					.replace("{{d3Js}}", d3Js.toString())
-					.replace("{{treeRenderer}}", treeRenderer.toString())
-					.replace("{{mainJs}}", mainJs.toString());
-
-				panel.webview.html = html;
-
-				// -------------------------------------------------
-				// WEBVIEW READY HANDLER
-				// -------------------------------------------------
-				let treeSent = false;
-
-				panel.webview.onDidReceiveMessage(async msg => {
-					console.log("[Extension] Mensaje desde Webview:", msg);
-
-					if (msg.type === 'ready' && !treeSent) {
-						console.log("[Extension] Webview READY → enviando árbol");
-						treeSent = true;
-
-						panel.webview.postMessage({
-							type: "treeData",
-							payload: tree
-						});
-					}
-
-					if (msg.type === 'openFile') {
-						const uri = vscode.Uri.file(msg.payload);
-						const doc = await vscode.workspace.openTextDocument(uri);
-						await vscode.window.showTextDocument(doc, { preview: false });
-					}
-				});
-
-				// Fallback si el webview no envía ready
-				setTimeout(() => {
-					if (!treeSent) {
-						console.warn("[Extension] Webview no envió READY → enviando árbol por fallback");
-						panel.webview.postMessage({
-							type: "treeData",
-							payload: tree
-						});
-					}
-				}, 800);
-
-				console.log("📤 [WebView] Árbol listo para envío.");
-
-			} catch (err) {
-				console.error("❌ [WebView] Error:", err);
-				vscode.window.showErrorMessage(
-					'Error while generating Angular hierarchy tree.'
-				);
-			}
 		}
 	);
 
