@@ -207,6 +207,24 @@ export class RouterResolver {
                     if (childId) childIds.push(childId);
                 }
             }
+
+            // component (NO lazy)
+            if (key === "component") {
+                const componentName = prop.initializer.getText();
+
+                const meta = allMetadata.find(
+                    m => m.className === componentName
+                );
+
+                if (meta) {
+                    componentId = meta.id;
+                    console.log("   ✔ component detectado:", componentName, "→", componentId);
+                } else {
+                    console.warn("   ⚠ component sin metadata:", componentName);
+                }
+
+                continue;
+            }
         }
 
         if (componentId) {

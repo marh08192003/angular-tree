@@ -7,6 +7,7 @@ import { ChildResolver } from './backed/ChildResolver';
 import { ImportResolver } from './backed/ImportResolver';
 import { RouterResolver } from './backed/RouterResolver';
 import { HierarchyBuilder } from './backed/HierarchyBuilder';
+import { ok } from 'assert';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -85,39 +86,32 @@ export function activate(context: vscode.ExtensionContext) {
 					{
 						enableScripts: true,
 						localResourceRoots: [
-							vscode.Uri.joinPath(
-								context.extensionUri,
-								'src',
-								'webview'
-							)
+							vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview')
 						]
 					}
-				);
+				); 
 
 				// -------------------------------------------------
 				// CARGAR HTML
 				// -------------------------------------------------
-				const htmlUri = vscode.Uri.joinPath(
-					context.extensionUri,
-					'src',
-					'webview',
-					'index.html'
-				);
+				const webviewRoot = vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview');
+
+				const htmlUri = vscode.Uri.joinPath(webviewRoot, 'index.html');
+
 				let html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
 
-				const webviewRoot = vscode.Uri.joinPath(context.extensionUri, "src", "webview");
 
 				const stylesCss = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, "styles.css")
+					vscode.Uri.joinPath(webviewRoot, 'styles.css')
 				);
 				const d3Js = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, "d3.min.js")
+					vscode.Uri.joinPath(webviewRoot, 'd3.min.js')
 				);
 				const treeRenderer = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, "TreeRenderer.js")
+					vscode.Uri.joinPath(webviewRoot, 'TreeRenderer.js')
 				);
 				const mainJs = panel.webview.asWebviewUri(
-					vscode.Uri.joinPath(webviewRoot, "main.js")
+					vscode.Uri.joinPath(webviewRoot, 'main.js')
 				);
 
 				html = html
