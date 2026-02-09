@@ -18,6 +18,7 @@ review, and refactoring.
   - `imports` in standalone components.
   - `loadComponent()` inside route configuration.
 - Builds a full parent → child hierarchy tree.
+- Supports collapsing and expanding nodes for large projects.
 - Click any node to jump directly to its source file.
 - Auto-refreshes the hierarchy every time you save a file.
 - Displays the tree inside a custom WebView using D3.js.
@@ -35,7 +36,8 @@ Angular Tree: Show Angular Hierarchy Tree
 
 3. A WebView panel will open showing the hierarchical structure of your
    component tree.
-4. Click any component in the tree to open its `.ts` source file.
+4. Click a node to expand or collapse its children.
+5. Click the component label to open its `.ts` source file.
 
 ---
 
@@ -44,7 +46,6 @@ Angular Tree: Show Angular Hierarchy Tree
 | Command                      | Description                                 |
 |------------------------------|---------------------------------------------|
 | `angular-tree.showHierarchy` | Opens the Angular hierarchy tree view.      |
-| `angular-tree.helloWorld`    | Sample command.                              |
 
 ---
 
@@ -84,6 +85,10 @@ This extension does not currently expose configuration settings.
 ---
 
 ## Release Notes
+
+### 1.1.0
+- Added collapsible and expandable nodes for improved navigation in large projects.
+- Tree state is preserved while navigating and reopening the view.
 
 ### 1.0.0
 

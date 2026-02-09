@@ -60,3 +60,7 @@ body {
     padding: 10px;
     color: var(--vscode-editorError-foreground);
 }
+
+.node-circle.collapsed {
+    fill: var(--vscode-editorWarning-foreground);
+}

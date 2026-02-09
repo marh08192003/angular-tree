@@ -7,14 +7,11 @@ class TreeRenderer {
 
     static render(tree, container, vscode) {
 
-        // Clean previous content
         container.innerHTML = "";
 
-        // Prepare SVG root
         const width = container.clientWidth || 800;
         const height = container.clientHeight || 600;
 
-        // Create SVG element with zoom/pan support
         const svg = d3.select(container)
             .append("svg")
             .attr("width", "100%")
@@ -27,67 +24,75 @@ class TreeRenderer {
 
         const g = svg.append("g");
 
-        // Convert HierarchyNode into D3 hierarchy structure
         const root = d3.hierarchy(tree);
 
-        // Set collapsible state
         root.x0 = height / 2;
         root.y0 = 0;
 
-        const treeLayout = d3.tree().nodeSize([40, 200]);
+        // 🔹 Colapsar todo menos root
+        if (root.children) {
+            root.children.forEach(collapse);
+        }
+
+        function collapse(node) {
+            if (node.children) {
+                node._children = node.children;
+                node._children.forEach(collapse);
+                node.children = null;
+            }
+        }
+
+        const treeLayout = d3.tree().nodeSize([40, 220]);
 
         update(root);
 
-        // ----------------------------------------
-        // UPDATE FUNCTION (MAIN D3 RENDER PIPELINE)
-        // ----------------------------------------
-
         function update(source) {
 
-            // Compute new layout
             treeLayout(root);
-            let nodes = root.descendants();
-            let links = root.links();
+            const nodes = root.descendants();
+            const links = root.links();
 
-            // Normalize depth spacing
             nodes.forEach(d => d.y = d.depth * 220);
 
             // -----------------------------
             // NODES
             // -----------------------------
             const node = g.selectAll("g.node")
-                .data(nodes, d => d.id || (d.id = Math.random()));
+                .data(nodes, d => d.id || (d.id = crypto.randomUUID()));
 
-            // Enter nodes
             const nodeEnter = node.enter()
                 .append("g")
                 .attr("class", "node")
-                .attr("transform", d => `translate(${source.y0}, ${source.x0})`)
-                .on("click", (event, d) => onNodeClick(event, d));
+                .attr("transform", `translate(${source.y0}, ${source.x0})`)
+                .on("click", (event, d) => toggleNode(event, d))
+                .on("dblclick", (event, d) => openFile(event, d));
 
-            // Circle
             nodeEnter.append("circle")
                 .attr("r", 8)
-                .attr("class", "node-circle");
+                .attr("class", d =>
+                    d._children ? "node-circle collapsed" : "node-circle"
+                );
 
-            // Label
             nodeEnter.append("text")
                 .attr("dy", "0.32em")
                 .attr("x", 14)
                 .text(d => d.data.name)
                 .attr("class", "node-label");
 
-            // Update position
             const nodeUpdate = nodeEnter.merge(node);
 
             nodeUpdate.transition()
                 .duration(250)
                 .attr("transform", d => `translate(${d.y}, ${d.x})`);
 
-            // Exit nodes
-            const nodeExit = node.exit().transition()
+            nodeUpdate.select("circle")
+                .attr("class", d =>
+                    d._children ? "node-circle collapsed" : "node-circle"
+                );
+
+            node.exit().transition()
                 .duration(200)
-                .attr("transform", d => `translate(${source.y}, ${source.x})`)
+                .attr("transform", `translate(${source.y}, ${source.x})`)
                 .remove();
 
             // -----------------------------
@@ -96,43 +101,52 @@ class TreeRenderer {
             const link = g.selectAll("path.link")
                 .data(links, d => d.target.id);
 
-            const linkEnter = link.enter()
+            link.enter()
                 .insert("path", "g")
                 .attr("class", "link")
-                .attr("d", d => diagonal(source, source));
-
-            const linkUpdate = linkEnter.merge(link);
-
-            linkUpdate.transition()
+                .attr("d", () => diagonal(source, source))
+                .merge(link)
+                .transition()
                 .duration(250)
                 .attr("d", d => diagonal(d.source, d.target));
 
             link.exit().transition()
                 .duration(200)
-                .attr("d", d => diagonal(source, source))
+                .attr("d", () => diagonal(source, source))
                 .remove();
 
-            // Store old position for transitions
             nodes.forEach(d => {
                 d.x0 = d.x;
                 d.y0 = d.y;
             });
         }
 
-        // ----------------------------------------
-        // NODE CLICK HANDLER
-        // ----------------------------------------
-        function onNodeClick(event, d) {
+        // -----------------------------
+        // HANDLERS
+        // -----------------------------
+        function toggleNode(event, d) {
+            event.stopPropagation();
+
+            if (d.children) {
+                d._children = d.children;
+                d.children = null;
+            } else {
+                d.children = d._children;
+                d._children = null;
+            }
+
+            update(d);
+        }
+
+        function openFile(event, d) {
+            event.stopPropagation();
+
             vscode.postMessage({
                 type: "openFile",
                 payload: d.data.filePath
             });
         }
 
-
-        // ----------------------------------------
-        // LINK SHAPE
-        // ----------------------------------------
         function diagonal(s, t) {
             return `
                 M ${s.y},${s.x}
@@ -144,5 +158,4 @@ class TreeRenderer {
     }
 }
 
-// expose globally
 window.TreeRenderer = TreeRenderer;
