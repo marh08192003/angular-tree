@@ -65,8 +65,7 @@ export class RouterResolver {
 
                 if (stat.isDirectory()) {
                     await walk(full);
-                } else if (f.includes("routes") && f.endsWith(".ts")) {
-
+                } else if (f.endsWith(".ts")) {
 
                     const normalized = full.replace(/\\/g, "/");
                     results.push(normalized);
@@ -165,10 +164,21 @@ export class RouterResolver {
             }
 
             if (key === "component") {
-                const componentName = prop.initializer.getText();
-                const meta = allMetadata.find(m => m.className === componentName);
-                if (meta) componentId = meta.id;
+
+                if (ts.isIdentifier(prop.initializer)) {
+
+                    const componentName = prop.initializer.text;
+
+                    const meta = allMetadata.find(m =>
+                        m.className === componentName
+                    );
+
+                    if (meta) {
+                        componentId = meta.id;
+                    }
+                }
             }
+
 
             if (key === "children" && ts.isArrayLiteralExpression(prop.initializer)) {
                 childrenNode = prop.initializer;
