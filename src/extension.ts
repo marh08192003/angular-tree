@@ -12,13 +12,13 @@ let panel: vscode.WebviewPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
 
-	console.log("🔌 [AngularTree] Extension activada.");
+
 
 	const showHierarchyCmd = vscode.commands.registerCommand(
 		'angular-tree.showHierarchy',
 		async () => {
 
-			console.log("📡 Generando Angular Hierarchy Tree...");
+
 
 			// -------------------------------------------------
 			// BACKEND PIPELINE
@@ -157,5 +157,5 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-	console.log("🛑 [AngularTree] Extension desactivada.");
+
 }

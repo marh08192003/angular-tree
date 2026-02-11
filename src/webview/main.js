@@ -1,6 +1,5 @@
 const vscode = acquireVsCodeApi();
 
-console.log("[Webview] main.js loaded");
 
 window.addEventListener("DOMContentLoaded", () => {
 
@@ -9,14 +8,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // 1️⃣ Si hay estado → render inmediato
     if (savedState?.tree) {
-        console.log("[Webview] Restoring tree from persisted state");
         treeRoot.innerHTML = "";
         TreeRenderer.render(savedState.tree, treeRoot, vscode);
         return;
     }
 
     // 2️⃣ Si NO hay estado → loading + pedir data
-    console.log("[Webview] No state found → requesting data");
 
     treeRoot.innerHTML = `
       <div class="loading">
@@ -33,7 +30,6 @@ window.addEventListener("message", event => {
     if (!message?.type) return;
 
     if (message.type === "treeData") {
-        console.log("[Webview] Received treeData");
 
         const treeRoot = document.getElementById("tree-root");
 

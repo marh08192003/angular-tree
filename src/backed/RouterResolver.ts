@@ -10,44 +10,32 @@ export class RouterResolver {
         workspaceRoot: string
     ): Promise<Record<string, string[]>> {
 
-        console.log("🔍 [RouterResolver] ====== INICIO RESOLVER RUTAS ======");
-        console.log("📁 Workspace root:", workspaceRoot);
-
         const routes: Record<string, string[]> = {};
 
         // Mapa rápido filePath → componentId
         const fileToComponentId = new Map<string, string>();
-        console.log("📌 [RouterResolver] Mapeando metadata...");
 
         allMetadata.forEach(m => {
             const normalized = m.filePath.replace(/\\/g, "/").toLowerCase();
             fileToComponentId.set(normalized, m.id);
-            console.log("   •", normalized, "→", m.id);
         });
 
         // Limitar búsqueda
         const appRoot = path.join(workspaceRoot, "src", "app");
-        console.log("📂 Directorio objetivo para buscar rutas:", appRoot);
 
         const routeFiles = await this.findRouteFiles(appRoot);
 
-        console.log("📄 Archivos .routes.ts encontrados:", routeFiles);
 
         const routeRelations = new Map<string, string[]>();
 
         for (const file of routeFiles) {
-            console.log("➡️ [RouterResolver] === Analizando archivo:", file, "===");
             await this.processRouteFile(file, allMetadata, routeRelations);
         }
 
-        console.log("🧪 [RouterResolver] RELATIONS MAP:", routeRelations);
 
         for (const [k, v] of routeRelations.entries()) {
-            console.log("   •", k, "→", v);
             routes[k] = v;
         }
-
-        console.log("🌳 [RouterResolver] ====== FIN RESOLVER RUTAS ======");
         return routes;
     }
 
@@ -57,14 +45,12 @@ export class RouterResolver {
     private async findRouteFiles(root: string): Promise<string[]> {
         const results: string[] = [];
 
-        console.log("🔎 [RouterResolver] Buscando archivos de rutas desde:", root);
 
         const walk = async (dir: string) => {
             let items: string[];
             try {
                 items = await fs.promises.readdir(dir);
             } catch (err) {
-                console.warn("⚠️ No se pudo leer dir:", dir);
                 return;
             }
 
@@ -83,7 +69,6 @@ export class RouterResolver {
 
 
                     const normalized = full.replace(/\\/g, "/");
-                    console.log("   📌 Encontrado:", normalized);
                     results.push(normalized);
                 }
             }
@@ -102,21 +87,17 @@ export class RouterResolver {
         routeRelations: Map<string, string[]>
     ) {
 
-        console.log("📄 [RouterResolver] Leyendo archivo de rutas:", filePath);
 
         const content = await fs.promises.readFile(filePath, "utf8");
         const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
 
-        console.log("🔎 Buscando 'export const routes = [...]'");
 
         const routesArray = this.findRoutesArray(sourceFile);
 
         if (!routesArray) {
-            console.warn("⚠️ No se encontró arreglo de rutas en:", filePath);
             return;
         }
 
-        console.log("🧩 Analizando elementos del arreglo de rutas... count =", routesArray.elements.length);
 
         const appComponent = allMetadata.find(m => m.selector === 'app-root');
         if (!appComponent) return;
@@ -147,7 +128,6 @@ export class RouterResolver {
                 node.initializer &&
                 ts.isArrayLiteralExpression(node.initializer)
             ) {
-                console.log("✔️ Arreglo de rutas encontrado.");
                 found = node.initializer;
             }
 
@@ -230,55 +210,45 @@ export class RouterResolver {
         allMetadata: AngularComponentMetadata[]
     ): string | null {
 
-        console.log("🔎 Analizando loadComponent...");
 
         if (!ts.isArrowFunction(node)) {
-            console.warn("   ⚠️ No es arrow function.");
             return null;
         }
 
         const body = node.body;
 
         if (!ts.isCallExpression(body)) {
-            console.warn("   ⚠️ Body no es CallExpression.");
             return null;
         }
 
         if (body.expression.kind !== ts.SyntaxKind.ImportKeyword) {
-            console.warn("   ⚠️ Llamada no es import().");
             return null;
         }
 
         const args = body.arguments;
 
         if (!args.length) {
-            console.warn("   ⚠️ import() sin argumentos.");
             return null;
         }
 
         const importArg = args[0];
 
         if (!ts.isStringLiteral(importArg)) {
-            console.warn("   ⚠️ import() argumento no es string.");
             return null;
         }
 
-        console.log("   ✔️ import path detectado:", importArg.text);
 
         const realPath = path.resolve(routeDir, importArg.text + ".ts");
         const normalized = realPath.replace(/\\/g, "/").toLowerCase();
 
-        console.log("   → Path absoluto:", normalized);
 
         const meta = allMetadata.find(m => m.filePath.replace(/\\/g, "/").toLowerCase() === normalized);
 
 
         if (!meta) {
-            console.warn("   ❌ No se encontró metadata para:", normalized);
             return null;
         }
 
-        console.log("   ✔️ Componente encontrado:", meta.id);
         return meta.id;
     }
 }

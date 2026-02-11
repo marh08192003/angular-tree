@@ -3,26 +3,35 @@ import * as vscode from 'vscode';
 /**
  * AngularScanner
  * ---------------
- * Scans the workspace for Angular component files (*.component.ts)
- * and returns their absolute paths.
- *
- * This is the first step of the metadata extraction pipeline.
+ * Scans the workspace for TypeScript files
+ * and returns only those that contain @Component decorator.
  */
 export class AngularScanner {
 
     public async scanComponents(): Promise<string[]> {
-        console.log("----------------------------------------------------");
-        console.log("📡 [Scanner] Buscando *.component.ts ...");
 
-        const pattern = '**/*.component.ts';
+        const pattern = '**/*.ts';
         const files = await vscode.workspace.findFiles(pattern);
 
-        console.log(`📁 [Scanner] Archivos encontrados (${files.length}):`);
-        files.forEach(f => console.log("   -", f.fsPath));
+        const componentFiles: string[] = [];
 
-        const filePaths = files.map(f => f.fsPath);
+        for (const file of files) {
+            try {
+                const document = await vscode.workspace.openTextDocument(file);
+                const text = document.getText();
 
-        console.log("----------------------------------------------------");
-        return filePaths;
+                // Detect Angular component decorator
+                if (text.includes('@Component(')) {
+                    componentFiles.push(file.fsPath);
+
+                }
+            } catch (err) {
+
+            }
+        }
+
+
+
+        return componentFiles;
     }
 }
